@@ -28,6 +28,9 @@ def train_and_predict(df):
     X = df[features]
     y = df['Signal'].shift(-1).fillna(False).astype(int)  # Convertir a enteros
     
+    # Revisión de los valores en 'y'
+    st.write("Valores únicos en y:", y.unique())
+
     X_train, X_test, y_train, y_test = train_test_split(X[:-1], y[:-1], test_size=0.3, random_state=42)
     
     # Modelos Ensemble
@@ -41,14 +44,17 @@ def train_and_predict(df):
     best_accuracy = 0
     
     for name, model in models.items():
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        st.write(f"{name} Accuracy: {accuracy:.2f}")
-        
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            best_model = model
+        try:
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+            st.write(f"{name} Accuracy: {accuracy:.2f}")
+            
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_model = model
+        except Exception as e:
+            st.error(f"Error al entrenar {name}: {e}")
     
     st.write("Mejor modelo:", type(best_model).__name__)
     
