@@ -28,7 +28,6 @@ def get_stock_data(ticker):
         df['MACD'] = ta.trend.macd(df['Close'])
         df['MACD_Signal'] = ta.trend.macd_signal(df['Close'])
         df['MACD_Histogram'] = ta.trend.macd_diff(df['Close'])
-        df['Volume'] = df['Volume']
         
         # Bandas de Bollinger
         bollinger = ta.volatility.BollingerBands(df['Close'])
@@ -62,7 +61,7 @@ def get_stock_data(ticker):
 
 # Función para predecir si el precio subirá utilizando un modelo de GradientBoosting
 def predict_stock(df):
-    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume', 'BB_High', 'BB_Low', 'Stochastic', 'Stochastic_Signal', 'ATR', 'CCI', 'ADL']
+    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'BB_High', 'BB_Low', 'Stochastic', 'Stochastic_Signal', 'ATR', 'CCI', 'ADL']
     X = df[features]
     y = df['Target']
     
@@ -111,22 +110,30 @@ def main():
             # Graficar los datos y los indicadores técnicos
             st.subheader("Gráficos de Indicadores Técnicos")
             fig, ax = plt.subplots(2, 2, figsize=(15, 10))
-            ax[0, 0].plot(df['Close'], label='Precio de Cierre')
-            ax[0, 0].plot(df['SMA_50'], label='SMA 50 días', alpha=0.7)
-            ax[0, 0].plot(df['SMA_200'], label='SMA 200 días', alpha=0.7)
+            
+            # Precio de Cierre y Medias Móviles
+            ax[0, 0].plot(df['Close'], label='Precio de Cierre', color='blue')
+            ax[0, 0].plot(df['SMA_50'], label='SMA 50 días', color='orange', alpha=0.7)
+            ax[0, 0].plot(df['SMA_200'], label='SMA 200 días', color='red', alpha=0.7)
             ax[0, 0].set_title('Precio de Cierre y Medias Móviles')
             ax[0, 0].legend()
             
-            ax[0, 1].plot(df['RSI'], label='RSI')
+            # RSI
+            ax[0, 1].plot(df['RSI'], label='RSI', color='green')
+            ax[0, 1].axhline(70, color='red', linestyle='--')
+            ax[0, 1].axhline(30, color='blue', linestyle='--')
             ax[0, 1].set_title('Índice de Fuerza Relativa (RSI)')
+            ax[0, 1].legend()
             
-            ax[1, 0].plot(df['MACD'], label='MACD')
-            ax[1, 0].plot(df['MACD_Signal'], label='MACD Signal', alpha=0.7)
+            # MACD y Línea de Señal
+            ax[1, 0].plot(df['MACD'], label='MACD', color='purple')
+            ax[1, 0].plot(df['MACD_Signal'], label='MACD Signal', color='orange', alpha=0.7)
             ax[1, 0].set_title('MACD y Línea de Señal')
             ax[1, 0].legend()
             
-            ax[1, 1].plot(df['BB_High'], label='Banda Superior')
-            ax[1, 1].plot(df['BB_Low'], label='Banda Inferior')
+            # Bandas de Bollinger
+            ax[1, 1].plot(df['BB_High'], label='Banda Superior', color='red')
+            ax[1, 1].plot(df['BB_Low'], label='Banda Inferior', color='blue')
             ax[1, 1].set_title('Bandas de Bollinger')
             ax[1, 1].legend()
             
