@@ -32,9 +32,6 @@ def predict_stock(df):
     X = df[features]
     y = df['Target']
     
-    # Verificar distribución de Target
-    st.write(df['Target'].value_counts())
-    
     # Escalar las características
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -56,12 +53,13 @@ def predict_stock(df):
     y_pred = best_model.predict(X_test)
     
     # Mostrar el informe de clasificación
-    st.write(classification_report(y_test, y_pred))
+    st.write("Informe de clasificación:")
+    st.text(classification_report(y_test, y_pred))
     
     # Realizar la predicción
     last_features = X_scaled[-1:].reshape(1, -1)
     prediction = best_model.predict(last_features)[0]
-    return prediction
+    return prediction, df
 
 # Configuración de la aplicación en Streamlit
 st.title("Predicción de Acciones")
@@ -80,23 +78,26 @@ if st.button("Predecir"):
             st.write(f"No se pudieron obtener datos para {ticker}.")
             continue
         
-        prediction = predict_stock(df)
+        prediction, df = predict_stock(df)
         
         st.subheader(f"Análisis de {ticker}")
+        
+        # Gráficos de tendencias
+        st.write("### Gráfico de Precios y Medias Móviles")
         st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
         
-        # Visualización de RSI
+        # Gráfico de RSI
         fig, ax = plt.subplots()
         sns.lineplot(data=df, x=df.index, y='RSI', ax=ax, color='blue', label='RSI')
-        ax.axhline(y=70, color='red', linestyle='--', label='Overbought')
-        ax.axhline(y=30, color='green', linestyle='--', label='Oversold')
+        ax.axhline(y=70, color='red', linestyle='--', label='Sobrecompra')
+        ax.axhline(y=30, color='green', linestyle='--', label='Sobreventa')
         ax.set_title(f'RSI de {ticker}')
         ax.set_xlabel('Fecha')
         ax.set_ylabel('RSI')
         ax.legend()
         st.pyplot(fig)
         
-        # Visualización de MACD
+        # Gráfico de MACD
         fig, ax = plt.subplots()
         sns.lineplot(data=df, x=df.index, y='MACD', ax=ax, color='blue', label='MACD')
         sns.lineplot(data=df, x=df.index, y='MACD_Signal', ax=ax, color='orange', label='MACD Signal')
@@ -107,8 +108,40 @@ if st.button("Predecir"):
         ax.legend()
         st.pyplot(fig)
         
+        # Gráfico de Volumen
+        fig, ax = plt.subplots()
+        sns.lineplot(data=df, x=df.index, y='Volume', ax=ax, color='purple', label='Volumen')
+        ax.set_title(f'Volumen de {ticker}')
+        ax.set_xlabel('Fecha')
+        ax.set_ylabel('Volumen')
+        ax.legend()
+        st.pyplot(fig)
+        
         # Mostrar resultado de la predicción
         if prediction:
             st.success(f"¡Se espera que el precio de {ticker} suba!")
         else:
             st.warning(f"No se espera un aumento en el precio de {ticker}.")
+        
+        # Explicación de la decisión
+        st.write("### Explicación de la Decisión")
+        
+        if df['SMA_50'].iloc[-1] > df['SMA_200'].iloc[-1]:
+            st.write("La media móvil de 50 días está por encima de la de 200 días, indicando una posible tendencia alcista.")
+        else:
+            st.write("La media móvil de 50 días está por debajo de la de 200 días, indicando una posible tendencia bajista.")
+        
+        if df['RSI'].iloc[-1] > 70:
+            st.write("El RSI está en sobrecompra, lo que podría indicar una posible reversión a la baja.")
+        elif df['RSI'].iloc[-1] < 30:
+            st.write("El RSI está en sobreventa, lo que podría indicar una posible reversión al alza.")
+        
+        if df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
+            st.write("El MACD está por encima de su línea de señal, indicando una posible señal de compra.")
+        else:
+            st.write("El MACD está por debajo de su línea de señal, indicando una posible señal de venta.")
+        
+        if df['Volume'].iloc[-1] > df['Volume'].rolling(window=20).mean().iloc[-1]:
+            st.write("El volumen está por encima de la media móvil de 20 días, lo que podría confirmar la fuerza de la tendencia.")
+        else:
+            st.write("El volumen está por debajo de la media móvil de 20 días, lo que podría indicar debilidad en la tendencia.")
