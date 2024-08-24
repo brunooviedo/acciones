@@ -21,6 +21,17 @@ def get_stock_data(ticker):
         df['MACD_Signal'] = ta.trend.macd_signal(df['Close'])
         df['MACD_Histogram'] = ta.trend.macd_diff(df['Close'])
         df['Volume'] = df['Volume']
+        
+        # Bandas de Bollinger
+        bollinger = ta.volatility.BollingerBands(df['Close'])
+        df['BB_High'] = bollinger.bollinger_hband()
+        df['BB_Low'] = bollinger.bollinger_lband()
+        
+        # Estocástico
+        stoch = ta.momentum.StochasticOscillator(df['High'], df['Low'], df['Close'])
+        df['Stochastic'] = stoch.stoch()
+        df['Stochastic_Signal'] = stoch.stoch_signal()
+        
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
     except Exception as e:
@@ -29,7 +40,7 @@ def get_stock_data(ticker):
 
 # Función para predecir si el precio subirá utilizando un modelo de RandomForest
 def predict_stock(df):
-    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume']
+    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume', 'BB_High', 'BB_Low', 'Stochastic', 'Stochastic_Signal']
     X = df[features]
     y = df['Target']
     
@@ -99,6 +110,28 @@ if st.button("Predecir"):
         st.write("### Gráfico de Precios y Medias Móviles")
         st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
         
+        # Gráfico de Bandas de Bollinger
+        fig, ax = plt.subplots()
+        sns.lineplot(data=df, x=df.index, y='Close', ax=ax, color='blue', label='Precio de Cierre')
+        ax.fill_between(df.index, df['BB_High'], df['BB_Low'], color='grey', alpha=0.2, label='Bandas de Bollinger')
+        ax.set_title(f'Bandas de Bollinger de {ticker}')
+        ax.set_xlabel('Fecha')
+        ax.set_ylabel('Precio')
+        ax.legend()
+        st.pyplot(fig)
+        
+        # Gráfico de Estocástico
+        fig, ax = plt.subplots()
+        sns.lineplot(data=df, x=df.index, y='Stochastic', ax=ax, color='blue', label='Estocástico')
+        sns.lineplot(data=df, x=df.index, y='Stochastic_Signal', ax=ax, color='orange', label='Señal Estocástica')
+        ax.axhline(y=80, color='red', linestyle='--', label='Sobrecompra')
+        ax.axhline(y=20, color='green', linestyle='--', label='Sobreventa')
+        ax.set_title(f'Estocástico de {ticker}')
+        ax.set_xlabel('Fecha')
+        ax.set_ylabel('Estocástico')
+        ax.legend()
+        st.pyplot(fig)
+        
         # Gráfico de RSI
         fig, ax = plt.subplots()
         sns.lineplot(data=df, x=df.index, y='RSI', ax=ax, color='blue', label='RSI')
@@ -149,12 +182,9 @@ if st.button("Predecir"):
         elif df['RSI'].iloc[-1] < 30:
             st.write("El RSI está en sobreventa, lo que podría indicar una posible reversión al alza.")
         
-        if df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
-            st.write("El MACD está por encima de su línea de señal, indicando una posible señal de compra.")
+        if df['Stochastic'].iloc[-1] > df['Stochastic_Signal'].iloc[-1]:
+            st.write("El estocástico está en alza, lo que podría indicar un movimiento alcista.")
         else:
-            st.write("El MACD está por debajo de su línea de señal, indicando una posible señal de venta.")
+            st.write("El estocástico está en baja, lo que podría indicar un movimiento bajista.")
         
-        if df['Volume'].iloc[-1] > df['Volume'].rolling(window=20).mean().iloc[-1]:
-            st.write("El volumen está por encima de la media móvil de 20 días, lo que podría confirmar la fuerza de la tendencia.")
-        else:
-            st.write("El volumen está por debajo de la media móvil de 20 días, lo que podría indicar debilidad en la tendencia.")
+        st.write("---")
