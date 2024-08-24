@@ -37,8 +37,8 @@ def get_stock_data(ticker):
         # CCI
         df['CCI'] = ta.trend.cci(df['High'], df['Low'], df['Close'], window=20)
         
-        # ADL
-        df['ADL'] = ta.volume.acc_dist_index(df['Close'], df['Volume'])
+        # ADL - Corregido para pasar series como argumentos
+        df['ADL'] = ta.volume.AccDistIndex(close=df['Close'], volume=df['Volume']).acc_dist_index()
         
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
