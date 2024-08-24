@@ -19,7 +19,6 @@ def get_stock_data(ticker):
         df['MACD'] = ta.trend.macd(df['Close'])
         df['MACD_Signal'] = ta.trend.macd_signal(df['Close'])
         df['MACD_Histogram'] = ta.trend.macd_diff(df['Close'])
-        df['Golden_Cross'] = df['SMA_50'] > df['SMA_200']  # Señal de cruce dorado
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
     except Exception as e:
@@ -32,6 +31,9 @@ def predict_stock(df):
     X = df[features]
     y = df['Target']
     
+    # Verificar distribución de Target
+    st.write(df['Target'].value_counts())
+    
     # Escalar las características
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -39,7 +41,7 @@ def predict_stock(df):
     # Dividir los datos en entrenamiento y prueba
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
     
-    # Evaluar el modelo
+    # Entrenar el modelo
     model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
@@ -59,14 +61,18 @@ def predict_stock(df):
 # Configuración de la aplicación en Streamlit
 st.title("Predicción de Acciones")
 
-tickers = st.text_input("Ingresa los tickers de las acciones separados por comas", "AAPL,MSFT,GOOGL")
-tickers = tickers.split(',')
+tickers = [
+    "JEPI", "TSLA", "MAIN", "AMZN", "JEPQ", "VOO", "PG", "MCD", "TQQQ",
+    "SCHD", "HD", "SVOL", "QQQ", "VIG", "MSFT", "SOXL", "GOOGL", "AMD",
+    "SCHG", "PEP", "LLY", "V", "CELH", "AAPL", "YINN"
+]
 
 if st.button("Predecir"):
     st.write("Analizando y prediciendo...")
     for ticker in tickers:
         df = get_stock_data(ticker.strip())
         if df.empty:
+            st.write(f"No se pudieron obtener datos para {ticker}.")
             continue
         
         prediction = predict_stock(df)
