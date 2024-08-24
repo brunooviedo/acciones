@@ -13,7 +13,7 @@ import numpy as np
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
     try:
-        df = yf.download(ticker, period='5y', interval='1d', progress=False)
+        df = yf.download(ticker, period='1y', interval='1d', progress=False)
         df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
         df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
         df['RSI'] = ta.momentum.rsi(df['Close'])
@@ -32,6 +32,15 @@ def get_stock_data(ticker):
         df['Stochastic'] = stoch.stoch()
         df['Stochastic_Signal'] = stoch.stoch_signal()
         
+        # ATR
+        df['ATR'] = ta.volatility.average_true_range(df['High'], df['Low'], df['Close'], window=14)
+        
+        # CCI
+        df['CCI'] = ta.trend.cci(df['High'], df['Low'], df['Close'], window=20)
+        
+        # ADL
+        df['ADL'] = ta.volume.acc_dist_index(df['Close'], df['Volume'])
+        
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
     except Exception as e:
@@ -40,7 +49,7 @@ def get_stock_data(ticker):
 
 # Función para predecir si el precio subirá utilizando un modelo de RandomForest
 def predict_stock(df):
-    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume', 'BB_High', 'BB_Low', 'Stochastic', 'Stochastic_Signal']
+    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume', 'BB_High', 'BB_Low', 'Stochastic', 'Stochastic_Signal', 'ATR', 'CCI', 'ADL']
     X = df[features]
     y = df['Target']
     
@@ -110,28 +119,6 @@ if st.button("Predecir"):
         st.write("### Gráfico de Precios y Medias Móviles")
         st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
         
-        # Gráfico de Bandas de Bollinger
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='Close', ax=ax, color='blue', label='Precio de Cierre')
-        ax.fill_between(df.index, df['BB_High'], df['BB_Low'], color='grey', alpha=0.2, label='Bandas de Bollinger')
-        ax.set_title(f'Bandas de Bollinger de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('Precio')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Gráfico de Estocástico
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='Stochastic', ax=ax, color='blue', label='Estocástico')
-        sns.lineplot(data=df, x=df.index, y='Stochastic_Signal', ax=ax, color='orange', label='Señal Estocástica')
-        ax.axhline(y=80, color='red', linestyle='--', label='Sobrecompra')
-        ax.axhline(y=20, color='green', linestyle='--', label='Sobreventa')
-        ax.set_title(f'Estocástico de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('Estocástico')
-        ax.legend()
-        st.pyplot(fig)
-        
         # Gráfico de RSI
         fig, ax = plt.subplots()
         sns.lineplot(data=df, x=df.index, y='RSI', ax=ax, color='blue', label='RSI')
@@ -154,37 +141,19 @@ if st.button("Predecir"):
         ax.legend()
         st.pyplot(fig)
         
-        # Gráfico de Volumen
+        # Gráfico de Bandas de Bollinger
         fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='Volume', ax=ax, color='purple', label='Volumen')
-        ax.set_title(f'Volumen de {ticker}')
+        sns.lineplot(data=df, x=df.index, y='Close', ax=ax, label='Precio de Cierre')
+        sns.lineplot(data=df, x=df.index, y='BB_High', ax=ax, color='red', linestyle='--', label='Banda Alta')
+        sns.lineplot(data=df, x=df.index, y='BB_Low', ax=ax, color='green', linestyle='--', label='Banda Baja')
+        ax.set_title(f'Bandas de Bollinger de {ticker}')
         ax.set_xlabel('Fecha')
-        ax.set_ylabel('Volumen')
+        ax.set_ylabel('Precio')
         ax.legend()
         st.pyplot(fig)
         
-        # Mostrar resultado de la predicción
+        # Decisión basada en el modelo
         if prediction:
-            st.success(f"¡Se espera que el precio de {ticker} suba!")
+            st.write(f"**Predicción para {ticker}: El precio podría subir.**")
         else:
-            st.warning(f"No se espera un aumento en el precio de {ticker}.")
-        
-        # Explicación de la decisión
-        st.write("### Explicación de la Decisión")
-        
-        if df['SMA_50'].iloc[-1] > df['SMA_200'].iloc[-1]:
-            st.write("La media móvil de 50 días está por encima de la de 200 días, indicando una posible tendencia alcista.")
-        else:
-            st.write("La media móvil de 50 días está por debajo de la de 200 días, indicando una posible tendencia bajista.")
-        
-        if df['RSI'].iloc[-1] > 70:
-            st.write("El RSI está en sobrecompra, lo que podría indicar una posible reversión a la baja.")
-        elif df['RSI'].iloc[-1] < 30:
-            st.write("El RSI está en sobreventa, lo que podría indicar una posible reversión al alza.")
-        
-        if df['Stochastic'].iloc[-1] > df['Stochastic_Signal'].iloc[-1]:
-            st.write("El estocástico está en alza, lo que podría indicar un movimiento alcista.")
-        else:
-            st.write("El estocástico está en baja, lo que podría indicar un movimiento bajista.")
-        
-        st.write("---")
+            st.write(f"**Predicción para {ticker}: El precio podría bajar.**")
