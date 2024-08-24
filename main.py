@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
@@ -84,7 +83,6 @@ def predict_stock(df):
 
 # Función para obtener una lista de tickers de ejemplo
 def get_example_tickers():
-    # Lista de tickers populares o de un índice amplio como el S&P 500
     example_tickers = [
         "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NKE", "NVDA", "IBM", "BA"
     ]
