@@ -4,7 +4,8 @@ import pandas as pd
 import ta
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -38,9 +39,17 @@ def predict_stock(df):
     # Dividir los datos en entrenamiento y prueba
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
     
-    # Entrenar el modelo
+    # Evaluar el modelo
     model = RandomForestClassifier(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    
+    # Mostrar el informe de clasificación
+    st.write(classification_report(y_test, y_pred))
+    
+    # Validación cruzada
+    scores = cross_val_score(model, X_scaled, y, cv=5)
+    st.write(f"Validación cruzada - Media de puntuaciones: {scores.mean()}")
     
     # Realizar la predicción
     last_features = X_scaled[-1:].reshape(1, -1)
