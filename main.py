@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pywhatkit as kit
 
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
@@ -61,19 +62,33 @@ def predict_stock(df):
     prediction = best_model.predict(last_features)[0]
     return prediction, df
 
+# Función para obtener una lista de tickers de ejemplo
+def get_example_tickers():
+    # Lista de tickers populares o de un índice amplio como el S&P 500
+    example_tickers = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NKE", "NVDA", "IBM", "BA"
+    ]
+    return example_tickers
+
 # Configuración de la aplicación en Streamlit
 st.title("Predicción de Acciones")
 
-tickers = [
-    "JEPI", "TSLA", "MAIN", "AMZN", "JEPQ", "VOO", "PG", "MCD", "TQQQ",
-    "SCHD", "HD", "SVOL", "QQQ", "VIG", "MSFT", "SOXL", "GOOGL", "AMD",
-    "SCHG", "PEP", "LLY", "V", "CELH", "AAPL", "YINN"
-]
+# Entrada de tickers del usuario
+user_tickers = st.text_input("Ingresa los tickers de las acciones separados por comas (deja en blanco para usar ejemplos)", "")
+user_tickers = [ticker.strip().upper() for ticker in user_tickers.split(',') if ticker.strip()]
+
+# Lista de tickers de ejemplo si el usuario no ingresa ninguno
+if not user_tickers:
+    tickers = get_example_tickers()
+else:
+    tickers = user_tickers
 
 if st.button("Predecir"):
     st.write("Analizando y prediciendo...")
+    messages = []  # Para almacenar los mensajes a enviar
+    
     for ticker in tickers:
-        df = get_stock_data(ticker.strip())
+        df = get_stock_data(ticker)
         if df.empty:
             st.write(f"No se pudieron obtener datos para {ticker}.")
             continue
@@ -120,6 +135,7 @@ if st.button("Predecir"):
         # Mostrar resultado de la predicción
         if prediction:
             st.success(f"¡Se espera que el precio de {ticker} suba!")
+            messages.append(f"¡Se espera que el precio de {ticker} suba!")
         else:
             st.warning(f"No se espera un aumento en el precio de {ticker}.")
         
@@ -145,3 +161,10 @@ if st.button("Predecir"):
             st.write("El volumen está por encima de la media móvil de 20 días, lo que podría confirmar la fuerza de la tendencia.")
         else:
             st.write("El volumen está por debajo de la media móvil de 20 días, lo que podría indicar debilidad en la tendencia.")
+
+    # Enviar mensajes por WhatsApp para las acciones que se espera que suban
+    if messages:
+        phone_number = '+56973866582'  # Reemplaza con el número de teléfono de destino
+        for message in messages:
+            kit.sendwhatmsg(phone_number, message, 17, 25)  # Enviar mensaje a las 15:00 (hora local)
+        st.write("Mensajes enviados por WhatsApp para acciones que se espera que suban.")
