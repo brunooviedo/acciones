@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
+import yfinance as yf
+import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
 
 # Título de la aplicación
-st.title('Calculadora de Rentabilidad con y sin Dividendos')
+st.title('Calculadora de Rentabilidad con Dividendos y Visualización de Gráfica')
 
 # DataFrame para almacenar las compras
 if 'compras' not in st.session_state:
@@ -12,7 +15,7 @@ if 'compras' not in st.session_state:
 with st.form('nueva_compra'):
     st.write("Agregar Nueva Compra")
     fecha = st.date_input('Fecha de compra')
-    accion = st.text_input('Nombre de la acción')
+    accion = st.text_input('Símbolo de la acción (por ejemplo, AAPL)')
     cantidad = st.number_input('Cantidad comprada', min_value=0.0, format="%.2f")
     precio = st.number_input('Precio de compra por acción', min_value=0.0, format="%.2f")
     dividendos = st.number_input('Dividendos por acción (anual)', min_value=0.0, format="%.2f")
@@ -32,6 +35,28 @@ if submit:
 # Mostrar las compras agregadas
 st.write("Compras realizadas:")
 st.write(st.session_state['compras'])
+
+# Gráfico de la acción
+if not st.session_state['compras'].empty:
+    accion = st.session_state['compras']['Acción'].iloc[0]  # Usar el símbolo de la primera compra
+    data = yf.download(accion, start=st.session_state['compras']['Fecha'].min(), end=pd.to_datetime('today'))
+    
+    # Crear el gráfico
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(data.index, data['Close'], label=f'Precio de {accion}')
+    
+    # Añadir puntos de compra
+    for _, compra in st.session_state['compras'].iterrows():
+        ax.plot(compra['Fecha'], compra['Precio'], 'ro')  # 'ro' para puntos rojos
+        ax.text(compra['Fecha'], compra['Precio'], f"Compra: {compra['Cantidad']}")
+
+    ax.set_title(f"Precio histórico de {accion}")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Precio de cierre (USD)")
+    ax.legend()
+    ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
 
 # Cálculo de la rentabilidad
 if not st.session_state['compras'].empty:
