@@ -1,17 +1,21 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import ta  # Biblioteca de indicadores técnicos
+import ta
 from sklearn.ensemble import RandomForestClassifier
 
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
-    df = yf.download(ticker, period='1y', interval='1d')
-    df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
-    df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
-    df['RSI'] = ta.momentum.rsi(df['Close'])
-    df['Signal'] = df['SMA_50'] > df['SMA_200']  # Señal de cruce dorado
-    return df.dropna()
+    try:
+        df = yf.download(ticker, period='1y', interval='1d', progress=False)
+        df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
+        df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
+        df['RSI'] = ta.momentum.rsi(df['Close'])
+        df['Signal'] = df['SMA_50'] > df['SMA_200']  # Señal de cruce dorado
+        return df.dropna()
+    except Exception as e:
+        st.error(f"Error al descargar datos para {ticker}: {e}")
+        return pd.DataFrame()
 
 # Función para predecir si el precio subirá utilizando un modelo básico
 def predict_stock(df):
@@ -34,6 +38,9 @@ if st.button("Predecir"):
     st.write("Analizando y prediciendo...")
     for ticker in tickers:
         df = get_stock_data(ticker.strip())
+        if df.empty:
+            continue
+        
         prediction = predict_stock(df)
         
         st.subheader(f"Análisis de {ticker}")
