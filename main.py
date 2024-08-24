@@ -4,7 +4,6 @@ import pandas as pd
 import ta
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import time
 
 # Configuración de la página de Streamlit
 st.set_page_config(page_title="Radar de Aumento de Acciones", layout="wide")
@@ -20,21 +19,10 @@ start_date = today - timedelta(days=365)  # Datos del último año
 symbol = st.text_input("Ingrese el símbolo de la acción", "AAPL").upper()
 
 # Obtener los datos históricos
-def get_data(symbol, start_date, retries=3, delay=5):
-    attempt = 0
-    while attempt < retries:
-        try:
-            data = yf.download(symbol, start=start_date, end=today)
-            if data.empty:
-                st.warning("No se encontraron datos para el símbolo ingresado.")
-            data['Date'] = data.index
-            return data
-        except Exception as e:
-            attempt += 1
-            st.error(f"Error al obtener datos (intento {attempt}): {e}")
-            time.sleep(delay)
-    st.error("No se pudo obtener datos después de varios intentos.")
-    return pd.DataFrame()
+def get_data(symbol, start_date):
+    data = yf.download(symbol, start=start_date, end=today)
+    data['Date'] = data.index
+    return data
 
 data = get_data(symbol, start_date)
 
