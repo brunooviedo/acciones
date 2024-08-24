@@ -13,7 +13,7 @@ import numpy as np
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
     try:
-        df = yf.download(ticker, period='1y', interval='1d', progress=False)
+        df = yf.download(ticker, period='5y', interval='1d', progress=False)
         df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
         df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
         df['RSI'] = ta.momentum.rsi(df['Close'])
