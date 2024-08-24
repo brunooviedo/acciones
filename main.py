@@ -1,109 +1,62 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
-import ta
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from sklearn.utils import resample
-import xgboost as xgb
 
-# Función para descargar datos y calcular indicadores técnicos
-def get_stock_data(ticker):
-    try:
-        df = yf.download(ticker, period='1y', interval='1d', progress=False)
-        df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
-        df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
-        df['RSI'] = ta.momentum.rsi(df['Close'])
-        df['MACD'] = ta.trend.macd_diff(df['Close'])
-        df['Stochastic'] = ta.momentum.stoch(df['High'], df['Low'], df['Close'])
-        df['Signal'] = (df['SMA_50'] > df['SMA_200']) & (df['RSI'] < 30)  # Combina señales
-        return df.dropna()
-    except Exception as e:
-        st.error(f"Error al descargar datos para {ticker}: {e}")
-        return pd.DataFrame()
+# Título de la aplicación
+st.title('Calculadora de Rentabilidad con y sin Dividendos')
 
-# Función para crear el modelo y realizar predicciones
-def train_and_predict(df):
-    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'Stochastic']
-    X = df[features]
-    y = df['Signal'].shift(-1).fillna(False).astype(int)  # Convertir a enteros
+# DataFrame para almacenar las compras
+if 'compras' not in st.session_state:
+    st.session_state['compras'] = pd.DataFrame(columns=['Fecha', 'Acción', 'Cantidad', 'Precio', 'Dividendos'])
+
+# Formulario para ingresar una nueva compra
+with st.form('nueva_compra'):
+    st.write("Agregar Nueva Compra")
+    fecha = st.date_input('Fecha de compra')
+    accion = st.text_input('Nombre de la acción')
+    cantidad = st.number_input('Cantidad comprada', min_value=0.0, format="%.2f")
+    precio = st.number_input('Precio de compra por acción', min_value=0.0, format="%.2f")
+    dividendos = st.number_input('Dividendos por acción (anual)', min_value=0.0, format="%.2f")
+    submit = st.form_submit_button('Agregar Compra')
+
+# Almacenar la nueva compra en el DataFrame
+if submit:
+    nueva_compra = pd.DataFrame({
+        'Fecha': [fecha],
+        'Acción': [accion],
+        'Cantidad': [cantidad],
+        'Precio': [precio],
+        'Dividendos': [dividendos]
+    })
+    st.session_state['compras'] = pd.concat([st.session_state['compras'], nueva_compra], ignore_index=True)
+
+# Mostrar las compras agregadas
+st.write("Compras realizadas:")
+st.write(st.session_state['compras'])
+
+# Cálculo de la rentabilidad
+if not st.session_state['compras'].empty:
+    total_invertido = (st.session_state['compras']['Cantidad'] * st.session_state['compras']['Precio']).sum()
+    total_dividendos = (st.session_state['compras']['Cantidad'] * st.session_state['compras']['Dividendos']).sum()
     
-    # Revisar el balance de clases en y
-    st.write("Balance de clases en y:", y.value_counts())
-
-    # Si las clases están desequilibradas, hacer sobremuestreo
-    if y.value_counts().min() == 0:
-        st.error("No hay suficiente variabilidad en las clases para entrenar el modelo.")
-        return None
-
-    X_train, X_test, y_train, y_test = train_test_split(X[:-1], y[:-1], test_size=0.3, random_state=42)
-
-    # Sobremuestrear la clase minoritaria si es necesario
-    if y_train.value_counts()[0] > y_train.value_counts()[1]:
-        X_train, y_train = resample(X_train[y_train == 1],
-                                    y_train[y_train == 1],
-                                    replace=True,
-                                    n_samples=y_train.value_counts()[0],
-                                    random_state=42)
-    else:
-        X_train, y_train = resample(X_train[y_train == 0],
-                                    y_train[y_train == 0],
-                                    replace=True,
-                                    n_samples=y_train.value_counts()[1],
-                                    random_state=42)
+    st.write(f"Total invertido: ${total_invertido:,.2f} CLP")
+    st.write(f"Total dividendos recibidos (anual): ${total_dividendos:,.2f} CLP")
     
-    # Modelos Ensemble
-    models = {
-        'Random Forest': RandomForestClassifier(),
-        'Gradient Boosting': GradientBoostingClassifier(),
-        'XGBoost': xgb.XGBClassifier()
-    }
+    # Rentabilidad sin dividendos
+    st.subheader("Rentabilidad sin dividendos:")
+    precio_actual = st.number_input('Precio actual de la acción', min_value=0.0, format="%.2f")
+    if precio_actual > 0:
+        valor_actual = (st.session_state['compras']['Cantidad'] * precio_actual).sum()
+        rentabilidad_sin_dividendos = ((valor_actual - total_invertido) / total_invertido) * 100
+        st.write(f"Rentabilidad sin dividendos: {rentabilidad_sin_dividendos:.2f}%")
     
-    best_model = None
-    best_accuracy = 0
-    
-    for name, model in models.items():
-        try:
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            st.write(f"{name} Accuracy: {accuracy:.2f}")
-            
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                best_model = model
-        except Exception as e:
-            st.error(f"Error al entrenar {name}: {e}")
-    
-    st.write("Mejor modelo:", type(best_model).__name__)
-    
-    # Predicción con el mejor modelo
-    if best_model:
-        prediction = best_model.predict(X[-1:])[0]
-        return prediction
-    else:
-        return None
+    # Rentabilidad con dividendos
+    st.subheader("Rentabilidad con dividendos:")
+    rentabilidad_con_dividendos = ((valor_actual + total_dividendos - total_invertido) / total_invertido) * 100
+    st.write(f"Rentabilidad con dividendos: {rentabilidad_con_dividendos:.2f}%")
+else:
+    st.write("No hay compras registradas.")
 
-# Configuración de la aplicación en Streamlit
-st.title("Predicción de Acciones Mejorada")
-
-tickers = st.text_input("Ingresa los tickers de las acciones separados por comas", "AAPL,MSFT,GOOGL")
-tickers = tickers.split(',')
-
-if st.button("Predecir"):
-    st.write("Analizando y prediciendo...")
-    for ticker in tickers:
-        df = get_stock_data(ticker.strip())
-        if df.empty:
-            continue
-        
-        prediction = train_and_predict(df)
-        
-        st.subheader(f"Análisis de {ticker}")
-        st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
-        
-        if prediction:
-            st.success(f"¡Se espera que el precio de {ticker} suba!")
-        else:
-            st.warning(f"No se espera un aumento en el precio de {ticker}.")
+# Agregar botón para reiniciar las compras
+if st.button('Reiniciar compras'):
+    st.session_state['compras'] = pd.DataFrame(columns=['Fecha', 'Acción', 'Cantidad', 'Precio', 'Dividendos'])
+    st.write("Las compras han sido reiniciadas.")
