@@ -15,7 +15,10 @@ def get_stock_data(ticker):
         df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
         df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
         df['RSI'] = ta.momentum.rsi(df['Close'])
-        df['Signal'] = df['SMA_50'] > df['SMA_200']  # Señal de cruce dorado
+        df['MACD'] = ta.trend.macd(df['Close'])
+        df['MACD_Signal'] = ta.trend.macd_signal(df['Close'])
+        df['MACD_Histogram'] = ta.trend.macd_diff(df['Close'])
+        df['Golden_Cross'] = df['SMA_50'] > df['SMA_200']  # Señal de cruce dorado
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
     except Exception as e:
@@ -24,7 +27,7 @@ def get_stock_data(ticker):
 
 # Función para predecir si el precio subirá utilizando un modelo de RandomForest
 def predict_stock(df):
-    features = ['SMA_50', 'SMA_200', 'RSI']
+    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram']
     X = df[features]
     y = df['Target']
     
@@ -70,6 +73,17 @@ if st.button("Predecir"):
         ax.set_title(f'RSI de {ticker}')
         ax.set_xlabel('Fecha')
         ax.set_ylabel('RSI')
+        ax.legend()
+        st.pyplot(fig)
+        
+        # Visualización de MACD
+        fig, ax = plt.subplots()
+        sns.lineplot(data=df, x=df.index, y='MACD', ax=ax, color='blue', label='MACD')
+        sns.lineplot(data=df, x=df.index, y='MACD_Signal', ax=ax, color='orange', label='MACD Signal')
+        ax.bar(df.index, df['MACD_Histogram'], color='grey', alpha=0.5, label='MACD Histogram')
+        ax.set_title(f'MACD de {ticker}')
+        ax.set_xlabel('Fecha')
+        ax.set_ylabel('MACD')
         ax.legend()
         st.pyplot(fig)
         
