@@ -19,9 +19,9 @@ def calculate_adl(df):
     return df
 
 # Función para descargar datos y calcular indicadores técnicos
-def get_stock_data(ticker):
+def get_stock_data(ticker, interval):
     try:
-        df = yf.download(ticker, period='1y', interval='1d', progress=False)
+        df = yf.download(ticker, period='1y', interval=interval, progress=False)
         df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
         df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
         df['RSI'] = ta.momentum.rsi(df['Close'])
@@ -104,6 +104,11 @@ st.title("Predicción de Acciones")
 user_tickers = st.text_input("Ingresa los tickers de las acciones separados por comas (deja en blanco para usar ejemplos)", "")
 user_tickers = [ticker.strip().upper() for ticker in user_tickers.split(',') if ticker.strip()]
 
+# Selección del intervalo de tiempo
+interval_options = {'Diario': '1d', 'Semanal': '1wk', 'Mensual': '1mo'}
+selected_interval = st.selectbox("Selecciona el intervalo de tiempo", list(interval_options.keys()))
+interval = interval_options[selected_interval]
+
 # Lista de tickers de ejemplo si el usuario no ingresa ninguno
 if not user_tickers:
     tickers = get_example_tickers()
@@ -113,7 +118,7 @@ else:
 if st.button("Predecir"):
     st.write("Analizando y prediciendo...")
     for ticker in tickers:
-        df = get_stock_data(ticker)
+        df = get_stock_data(ticker, interval)
         if df.empty:
             st.write(f"No se pudieron obtener datos para {ticker}.")
             continue
