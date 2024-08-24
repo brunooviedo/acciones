@@ -1,87 +1,71 @@
 import streamlit as st
-import pandas as pd
 import yfinance as yf
-import matplotlib.pyplot as plt
-from matplotlib.dates import DateFormatter
+import pandas as pd
+import ta
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+
+# Configuración de la página de Streamlit
+st.set_page_config(page_title="Radar de Aumento de Acciones", layout="wide")
 
 # Título de la aplicación
-st.title('Calculadora de Rentabilidad con Dividendos y Visualización de Gráfica')
+st.title("Radar de Aumento de Acciones")
 
-# DataFrame para almacenar las compras
-if 'compras' not in st.session_state:
-    st.session_state['compras'] = pd.DataFrame(columns=['Fecha', 'Acción', 'Cantidad', 'Precio', 'Dividendos'])
+# Configuración del rango de fechas
+today = datetime.now().date()
+start_date = today - timedelta(days=365)  # Datos del último año
 
-# Formulario para ingresar una nueva compra
-with st.form('nueva_compra'):
-    st.write("Agregar Nueva Compra")
-    fecha = st.date_input('Fecha de compra')
-    accion = st.text_input('Símbolo de la acción (por ejemplo, AAPL)')
-    cantidad = st.number_input('Cantidad comprada', min_value=0.0, format="%.2f")
-    precio = st.number_input('Precio de compra por acción', min_value=0.0, format="%.2f")
-    dividendos = st.number_input('Dividendos por acción (anual)', min_value=0.0, format="%.2f")
-    submit = st.form_submit_button('Agregar Compra')
+# Interfaz de usuario para ingresar el símbolo de la acción
+symbol = st.text_input("Ingrese el símbolo de la acción", "AAPL").upper()
 
-# Almacenar la nueva compra en el DataFrame
-if submit:
-    nueva_compra = pd.DataFrame({
-        'Fecha': [fecha],
-        'Acción': [accion],
-        'Cantidad': [cantidad],
-        'Precio': [precio],
-        'Dividendos': [dividendos]
-    })
-    st.session_state['compras'] = pd.concat([st.session_state['compras'], nueva_compra], ignore_index=True)
+# Obtener los datos históricos
+def get_data(symbol, start_date):
+    data = yf.download(symbol, start=start_date, end=today)
+    data['Date'] = data.index
+    return data
 
-# Mostrar las compras agregadas
-st.write("Compras realizadas:")
-st.write(st.session_state['compras'])
+data = get_data(symbol, start_date)
 
-# Gráfico de la acción
-if not st.session_state['compras'].empty:
-    accion = st.session_state['compras']['Acción'].iloc[0]  # Usar el símbolo de la primera compra
-    data = yf.download(accion, start=st.session_state['compras']['Fecha'].min(), end=pd.to_datetime('today'))
-    
-    # Crear el gráfico
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(data.index, data['Close'], label=f'Precio de {accion}')
-    
-    # Añadir puntos de compra
-    for _, compra in st.session_state['compras'].iterrows():
-        ax.plot(compra['Fecha'], compra['Precio'], 'ro')  # 'ro' para puntos rojos
-        ax.text(compra['Fecha'], compra['Precio'], f"Compra: {compra['Cantidad']}")
+if not data.empty:
+    # Cálculo de indicadores técnicos
+    data['EMA_20'] = ta.trend.EMAIndicator(data['Close'], window=20).ema_indicator()
+    data['EMA_50'] = ta.trend.EMAIndicator(data['Close'], window=50).ema_indicator()
+    data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
 
-    ax.set_title(f"Precio histórico de {accion}")
-    ax.set_xlabel("Fecha")
-    ax.set_ylabel("Precio de cierre (USD)")
-    ax.legend()
-    ax.xaxis.set_major_formatter(DateFormatter("%Y-%m-%d"))
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    # Condiciones de compra basadas en los indicadores
+    last_rsi = data['RSI'].iloc[-1]
+    last_ema_20 = data['EMA_20'].iloc[-1]
+    last_ema_50 = data['EMA_50'].iloc[-1]
 
-# Cálculo de la rentabilidad
-if not st.session_state['compras'].empty:
-    total_invertido = (st.session_state['compras']['Cantidad'] * st.session_state['compras']['Precio']).sum()
-    total_dividendos = (st.session_state['compras']['Cantidad'] * st.session_state['compras']['Dividendos']).sum()
-    
-    st.write(f"Total invertido: ${total_invertido:,.2f} CLP")
-    st.write(f"Total dividendos recibidos (anual): ${total_dividendos:,.2f} CLP")
-    
-    # Rentabilidad sin dividendos
-    st.subheader("Rentabilidad sin dividendos:")
-    precio_actual = st.number_input('Precio actual de la acción', min_value=0.0, format="%.2f")
-    if precio_actual > 0:
-        valor_actual = (st.session_state['compras']['Cantidad'] * precio_actual).sum()
-        rentabilidad_sin_dividendos = ((valor_actual - total_invertido) / total_invertido) * 100
-        st.write(f"Rentabilidad sin dividendos: {rentabilidad_sin_dividendos:.2f}%")
-    
-    # Rentabilidad con dividendos
-    st.subheader("Rentabilidad con dividendos:")
-    rentabilidad_con_dividendos = ((valor_actual + total_dividendos - total_invertido) / total_invertido) * 100
-    st.write(f"Rentabilidad con dividendos: {rentabilidad_con_dividendos:.2f}%")
+    buy_signal = last_rsi < 30 and last_ema_20 > last_ema_50  # Ejemplo de condiciones para compra
+
+    # Visualización de los datos
+    fig = go.Figure()
+
+    # Gráfico de precios
+    fig.add_trace(go.Candlestick(x=data.index,
+                                open=data['Open'],
+                                high=data['High'],
+                                low=data['Low'],
+                                close=data['Close'],
+                                name='Candlestick'))
+
+    # Gráficos de EMA
+    fig.add_trace(go.Scatter(x=data.index, y=data['EMA_20'], mode='lines', name='EMA 20'))
+    fig.add_trace(go.Scatter(x=data.index, y=data['EMA_50'], mode='lines', name='EMA 50'))
+
+    # Configuración del diseño
+    fig.update_layout(title=f'Análisis de {symbol}',
+                      xaxis_title='Fecha',
+                      yaxis_title='Precio',
+                      xaxis_rangeslider_visible=False)
+
+    st.plotly_chart(fig)
+
+    # Mostrar señales de compra
+    if buy_signal:
+        st.success(f"¡Señal de compra para {symbol}!")
+    else:
+        st.warning(f"No hay señal de compra para {symbol}.")
 else:
-    st.write("No hay compras registradas.")
-
-# Agregar botón para reiniciar las compras
-if st.button('Reiniciar compras'):
-    st.session_state['compras'] = pd.DataFrame(columns=['Fecha', 'Acción', 'Cantidad', 'Precio', 'Dividendos'])
-    st.write("Las compras han sido reiniciadas.")
+    st.error("No se encontraron datos para el símbolo ingresado.")
