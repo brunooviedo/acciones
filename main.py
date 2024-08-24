@@ -5,6 +5,7 @@ import ta
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.utils import resample
 import xgboost as xgb
 
 # Función para descargar datos y calcular indicadores técnicos
@@ -28,10 +29,29 @@ def train_and_predict(df):
     X = df[features]
     y = df['Signal'].shift(-1).fillna(False).astype(int)  # Convertir a enteros
     
-    # Revisión de los valores en 'y'
-    st.write("Valores únicos en y:", y.unique())
+    # Revisar el balance de clases en y
+    st.write("Balance de clases en y:", y.value_counts())
+
+    # Si las clases están desequilibradas, hacer sobremuestreo
+    if y.value_counts().min() == 0:
+        st.error("No hay suficiente variabilidad en las clases para entrenar el modelo.")
+        return None
 
     X_train, X_test, y_train, y_test = train_test_split(X[:-1], y[:-1], test_size=0.3, random_state=42)
+
+    # Sobremuestrear la clase minoritaria si es necesario
+    if y_train.value_counts()[0] > y_train.value_counts()[1]:
+        X_train, y_train = resample(X_train[y_train == 1],
+                                    y_train[y_train == 1],
+                                    replace=True,
+                                    n_samples=y_train.value_counts()[0],
+                                    random_state=42)
+    else:
+        X_train, y_train = resample(X_train[y_train == 0],
+                                    y_train[y_train == 0],
+                                    replace=True,
+                                    n_samples=y_train.value_counts()[1],
+                                    random_state=42)
     
     # Modelos Ensemble
     models = {
@@ -59,8 +79,11 @@ def train_and_predict(df):
     st.write("Mejor modelo:", type(best_model).__name__)
     
     # Predicción con el mejor modelo
-    prediction = best_model.predict(X[-1:])[0]
-    return prediction
+    if best_model:
+        prediction = best_model.predict(X[-1:])[0]
+        return prediction
+    else:
+        return None
 
 # Configuración de la aplicación en Streamlit
 st.title("Predicción de Acciones Mejorada")
