@@ -104,68 +104,68 @@ st.title("Predicción de Acciones")
 user_tickers = st.text_input("Ingresa los tickers de las acciones separados por comas (deja en blanco para usar ejemplos)", "")
 user_tickers = [ticker.strip().upper() for ticker in user_tickers.split(',') if ticker.strip()]
 
-# Selección del intervalo de tiempo
-interval_options = {'Diario': '1d', 'Semanal': '1wk', 'Mensual': '1mo'}
-selected_interval = st.selectbox("Selecciona el intervalo de tiempo", list(interval_options.keys()))
-interval = interval_options[selected_interval]
-
 # Lista de tickers de ejemplo si el usuario no ingresa ninguno
 if not user_tickers:
     tickers = get_example_tickers()
 else:
     tickers = user_tickers
 
+# Períodos de análisis
+intervals = ['1d', '1wk', '1mo']
+
 if st.button("Predecir"):
     st.write("Analizando y prediciendo...")
     for ticker in tickers:
-        df = get_stock_data(ticker, interval)
-        if df.empty:
-            st.write(f"No se pudieron obtener datos para {ticker}.")
-            continue
-        
-        prediction, df = predict_stock(df)
-        
         st.subheader(f"Análisis de {ticker}")
-        
-        # Gráficos de tendencias
-        st.write("### Gráfico de Precios y Medias Móviles")
-        st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
-        
-        # Gráfico de RSI
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='RSI', ax=ax, color='blue', label='RSI')
-        ax.axhline(y=70, color='red', linestyle='--', label='Sobrecompra')
-        ax.axhline(y=30, color='green', linestyle='--', label='Sobreventa')
-        ax.set_title(f'RSI de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('RSI')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Gráfico de MACD
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='MACD', ax=ax, color='blue', label='MACD')
-        sns.lineplot(data=df, x=df.index, y='MACD_Signal', ax=ax, color='orange', label='MACD Signal')
-        ax.bar(df.index, df['MACD_Histogram'], color='grey', alpha=0.5, label='MACD Histogram')
-        ax.set_title(f'MACD de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('MACD')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Gráfico de Bandas de Bollinger
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='Close', ax=ax, label='Precio de Cierre')
-        sns.lineplot(data=df, x=df.index, y='BB_High', ax=ax, color='red', linestyle='--', label='Banda Alta')
-        sns.lineplot(data=df, x=df.index, y='BB_Low', ax=ax, color='green', linestyle='--', label='Banda Baja')
-        ax.set_title(f'Bandas de Bollinger de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('Precio')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Decisión basada en el modelo
-        if prediction:
-            st.write(f"**Predicción para {ticker}: El precio podría subir.**")
-        else:
-            st.write(f"**Predicción para {ticker}: El precio podría bajar.**")
+
+        for interval in intervals:
+            df = get_stock_data(ticker, interval)
+            if df.empty:
+                st.write(f"No se pudieron obtener datos para {ticker} con intervalo {interval}.")
+                continue
+            
+            prediction, df = predict_stock(df)
+            
+            # Gráficos de tendencias
+            st.write(f"### Intervalo: {interval}")
+            st.write("#### Gráfico de Precios y Medias Móviles")
+            st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
+            
+            # Gráfico de RSI
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='RSI', ax=ax, color='blue', label='RSI')
+            ax.axhline(y=70, color='red', linestyle='--', label='Sobrecompra')
+            ax.axhline(y=30, color='green', linestyle='--', label='Sobreventa')
+            ax.set_title(f'RSI de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('RSI')
+            ax.legend()
+            st.pyplot(fig)
+            
+            # Gráfico de MACD
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='MACD', ax=ax, color='blue', label='MACD')
+            sns.lineplot(data=df, x=df.index, y='MACD_Signal', ax=ax, color='orange', label='MACD Signal')
+            ax.bar(df.index, df['MACD_Histogram'], color='grey', alpha=0.5, label='MACD Histogram')
+            ax.set_title(f'MACD de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('MACD')
+            ax.legend()
+            st.pyplot(fig)
+            
+            # Gráfico de Bandas de Bollinger
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='Close', ax=ax, label='Precio de Cierre')
+            sns.lineplot(data=df, x=df.index, y='BB_High', ax=ax, color='red', linestyle='--', label='Banda Alta')
+            sns.lineplot(data=df, x=df.index, y='BB_Low', ax=ax, color='green', linestyle='--', label='Banda Baja')
+            ax.set_title(f'Bandas de Bollinger de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('Precio')
+            ax.legend()
+            st.pyplot(fig)
+            
+            # Decisión basada en el modelo
+            if prediction:
+                st.write(f"**Predicción para {ticker} en intervalo {interval}: El precio podría subir.**")
+            else:
+                st.write(f"**Predicción para {ticker} en intervalo {interval}: El precio podría bajar.**")
