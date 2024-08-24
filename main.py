@@ -3,8 +3,8 @@ import yfinance as yf
 import pandas as pd
 import ta
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 import xgboost as xgb
 
 # Función para descargar datos y calcular indicadores técnicos
@@ -26,7 +26,7 @@ def get_stock_data(ticker):
 def train_and_predict(df):
     features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'Stochastic']
     X = df[features]
-    y = df['Signal'].shift(-1).fillna(False)
+    y = df['Signal'].shift(-1).fillna(False).astype(int)  # Convertir a enteros
     
     X_train, X_test, y_train, y_test = train_test_split(X[:-1], y[:-1], test_size=0.3, random_state=42)
     
