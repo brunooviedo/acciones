@@ -22,6 +22,11 @@ def calculate_adl(df):
 def get_stock_data(ticker, interval):
     try:
         df = yf.download(ticker, period='1y', interval=interval, progress=False)
+        
+        # Verificar si el DataFrame contiene datos suficientes
+        if len(df) < 30:
+            raise ValueError("Datos insuficientes para el intervalo seleccionado.")
+        
         df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
         df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
         df['RSI'] = ta.momentum.rsi(df['Close'])
@@ -52,7 +57,7 @@ def get_stock_data(ticker, interval):
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
     except Exception as e:
-        st.error(f"Error al descargar datos para {ticker}: {e}")
+        st.error(f"Error al descargar datos para {ticker} con intervalo {interval}: {e}")
         return pd.DataFrame()
 
 # Función para predecir si el precio subirá utilizando un modelo de RandomForest
@@ -164,8 +169,43 @@ if st.button("Predecir"):
             ax.legend()
             st.pyplot(fig)
             
-            # Decisión basada en el modelo
-            if prediction:
-                st.write(f"**Predicción para {ticker} en intervalo {interval}: El precio podría subir.**")
-            else:
-                st.write(f"**Predicción para {ticker} en intervalo {interval}: El precio podría bajar.**")
+            # Gráfico de Estocástico
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='Stochastic', ax=ax, color='blue', label='Estocástico')
+            sns.lineplot(data=df, x=df.index, y='Stochastic_Signal', ax=ax, color='orange', label='Señal Estocástica')
+            ax.set_title(f'Estocástico de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('Estocástico')
+            ax.legend()
+            st.pyplot(fig)
+            
+            # Gráfico de ATR
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='ATR', ax=ax, color='blue', label='ATR')
+            ax.set_title(f'ATR de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('ATR')
+            ax.legend()
+            st.pyplot(fig)
+            
+            # Gráfico de CCI
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='CCI', ax=ax, color='blue', label='CCI')
+            ax.axhline(y=100, color='red', linestyle='--', label='Sobrecompra')
+            ax.axhline(y=-100, color='green', linestyle='--', label='Sobreventa')
+            ax.set_title(f'CCI de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('CCI')
+            ax.legend()
+            st.pyplot(fig)
+            
+            # Gráfico de ADL
+            fig, ax = plt.subplots()
+            sns.lineplot(data=df, x=df.index, y='ADL', ax=ax, color='blue', label='ADL')
+            ax.set_title(f'ADL de {ticker} ({interval})')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('ADL')
+            ax.legend()
+            st.pyplot(fig)
+            
+            st.write(f"Predicción para {ticker} con intervalo {interval}: {'Subida' if prediction else 'Bajada'}")
