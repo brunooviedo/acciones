@@ -4,7 +4,7 @@ import pandas as pd
 import ta
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -19,6 +19,7 @@ def get_stock_data(ticker):
         df['MACD'] = ta.trend.macd(df['Close'])
         df['MACD_Signal'] = ta.trend.macd_signal(df['Close'])
         df['MACD_Histogram'] = ta.trend.macd_diff(df['Close'])
+        df['Volume'] = df['Volume']
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
     except Exception as e:
@@ -27,7 +28,7 @@ def get_stock_data(ticker):
 
 # Función para predecir si el precio subirá utilizando un modelo de RandomForest
 def predict_stock(df):
-    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram']
+    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume']
     X = df[features]
     y = df['Target']
     
@@ -41,21 +42,25 @@ def predict_stock(df):
     # Dividir los datos en entrenamiento y prueba
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
     
-    # Entrenar el modelo
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    # Ajuste de hiperparámetros para RandomForest
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20, 30],
+        'min_samples_split': [2, 5, 10]
+    }
+    
+    grid_search = GridSearchCV(estimator=RandomForestClassifier(random_state=42), param_grid=param_grid, cv=5, scoring='accuracy')
+    grid_search.fit(X_train, y_train)
+    
+    best_model = grid_search.best_estimator_
+    y_pred = best_model.predict(X_test)
     
     # Mostrar el informe de clasificación
     st.write(classification_report(y_test, y_pred))
     
-    # Validación cruzada
-    scores = cross_val_score(model, X_scaled, y, cv=5)
-    st.write(f"Validación cruzada - Media de puntuaciones: {scores.mean()}")
-    
     # Realizar la predicción
     last_features = X_scaled[-1:].reshape(1, -1)
-    prediction = model.predict(last_features)[0]
+    prediction = best_model.predict(last_features)[0]
     return prediction
 
 # Configuración de la aplicación en Streamlit
