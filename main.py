@@ -20,9 +20,15 @@ symbol = st.text_input("Ingrese el símbolo de la acción", "AAPL").upper()
 
 # Obtener los datos históricos
 def get_data(symbol, start_date):
-    data = yf.download(symbol, start=start_date, end=today)
-    data['Date'] = data.index
-    return data
+    try:
+        data = yf.download(symbol, start=start_date, end=today)
+        if data.empty:
+            st.warning("No se encontraron datos para el símbolo ingresado.")
+        data['Date'] = data.index
+        return data
+    except Exception as e:
+        st.error(f"Error al obtener datos: {e}")
+        return pd.DataFrame()
 
 data = get_data(symbol, start_date)
 
