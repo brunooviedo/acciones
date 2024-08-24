@@ -9,6 +9,15 @@ from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Función para calcular el ADL manualmente
+def calculate_adl(df):
+    df['ADL'] = 0
+    for i in range(1, len(df)):
+        df.loc[df.index[i], 'ADL'] = df.loc[df.index[i-1], 'ADL'] + \
+            ((2 * df.loc[df.index[i], 'Close'] - df.loc[df.index[i], 'Low'] - df.loc[df.index[i], 'High']) / 
+            (df.loc[df.index[i], 'High'] - df.loc[df.index[i], 'Low'])) * df.loc[df.index[i], 'Volume']
+    return df
+
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
     try:
@@ -37,8 +46,8 @@ def get_stock_data(ticker):
         # CCI
         df['CCI'] = ta.trend.cci(df['High'], df['Low'], df['Close'], window=20)
         
-        # ADL - Corregido para pasar series como argumentos
-        df['ADL'] = ta.volume.AccDistIndex(close=df['Close'], volume=df['Volume']).acc_dist_index()
+        # Calcular ADL manualmente
+        df = calculate_adl(df)
         
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
         return df.dropna()
