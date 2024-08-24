@@ -2,9 +2,9 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import ta
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -50,12 +50,17 @@ def get_stock_data(ticker):
         df = calculate_adl(df)
         
         df['Target'] = df['Close'].shift(-1) > df['Close']  # Objetivo de predicción (subida del precio)
+        
+        # Verifica el balance de las clases
+        st.write(f"Balance de clases para {ticker}:")
+        st.write(df['Target'].value_counts())
+        
         return df.dropna()
     except Exception as e:
         st.error(f"Error al descargar datos para {ticker}: {e}")
         return pd.DataFrame()
 
-# Función para predecir si el precio subirá utilizando un modelo de RandomForest
+# Función para predecir si el precio subirá utilizando un modelo de GradientBoosting
 def predict_stock(df):
     features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'MACD_Signal', 'MACD_Histogram', 'Volume', 'BB_High', 'BB_Low', 'Stochastic', 'Stochastic_Signal', 'ATR', 'CCI', 'ADL']
     X = df[features]
@@ -65,102 +70,70 @@ def predict_stock(df):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Dividir los datos en entrenamiento y prueba
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+    # Dividir los datos en entrenamiento y prueba con estratificación
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     
-    # Ajuste de hiperparámetros para RandomForest
-    param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [None, 10, 20, 30],
-        'min_samples_split': [2, 5, 10]
-    }
+    model = GradientBoostingClassifier()
+    grid_search = GridSearchCV(estimator=model, param_grid={
+        'n_estimators': [50, 100],
+        'learning_rate': [0.01, 0.1],
+        'max_depth': [3, 5, 7]
+    }, cv=skf, scoring='accuracy')
     
-    grid_search = GridSearchCV(estimator=RandomForestClassifier(random_state=42), param_grid=param_grid, cv=5, scoring='accuracy')
-    grid_search.fit(X_train, y_train)
-    
+    grid_search.fit(X_scaled, y)
     best_model = grid_search.best_estimator_
-    y_pred = best_model.predict(X_test)
+    
+    # Evaluar el modelo
+    y_pred = best_model.predict(X_scaled)
     
     # Mostrar el informe de clasificación
     st.write("Informe de clasificación:")
-    st.text(classification_report(y_test, y_pred))
+    st.text(classification_report(y, y_pred))
     
     # Realizar la predicción
     last_features = X_scaled[-1:].reshape(1, -1)
     prediction = best_model.predict(last_features)[0]
     return prediction, df
 
-# Función para obtener una lista de tickers de ejemplo
-def get_example_tickers():
-    example_tickers = [
-        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "NKE", "NVDA", "IBM", "BA"
-    ]
-    return example_tickers
-
-# Configuración de la aplicación en Streamlit
-st.title("Predicción de Acciones")
-
-# Entrada de tickers del usuario
-user_tickers = st.text_input("Ingresa los tickers de las acciones separados por comas (deja en blanco para usar ejemplos)", "")
-user_tickers = [ticker.strip().upper() for ticker in user_tickers.split(',') if ticker.strip()]
-
-# Lista de tickers de ejemplo si el usuario no ingresa ninguno
-if not user_tickers:
-    tickers = get_example_tickers()
-else:
-    tickers = user_tickers
-
-if st.button("Predecir"):
-    st.write("Analizando y prediciendo...")
-    for ticker in tickers:
+# Main Streamlit App
+def main():
+    st.title("Análisis y Predicción de Acciones")
+    
+    ticker = st.text_input("Introduce el ticker de la acción (por ejemplo, AAPL):")
+    
+    if ticker:
         df = get_stock_data(ticker)
-        if df.empty:
-            st.write(f"No se pudieron obtener datos para {ticker}.")
-            continue
         
-        prediction, df = predict_stock(df)
-        
-        st.subheader(f"Análisis de {ticker}")
-        
-        # Gráficos de tendencias
-        st.write("### Gráfico de Precios y Medias Móviles")
-        st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
-        
-        # Gráfico de RSI
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='RSI', ax=ax, color='blue', label='RSI')
-        ax.axhline(y=70, color='red', linestyle='--', label='Sobrecompra')
-        ax.axhline(y=30, color='green', linestyle='--', label='Sobreventa')
-        ax.set_title(f'RSI de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('RSI')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Gráfico de MACD
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='MACD', ax=ax, color='blue', label='MACD')
-        sns.lineplot(data=df, x=df.index, y='MACD_Signal', ax=ax, color='orange', label='MACD Signal')
-        ax.bar(df.index, df['MACD_Histogram'], color='grey', alpha=0.5, label='MACD Histogram')
-        ax.set_title(f'MACD de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('MACD')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Gráfico de Bandas de Bollinger
-        fig, ax = plt.subplots()
-        sns.lineplot(data=df, x=df.index, y='Close', ax=ax, label='Precio de Cierre')
-        sns.lineplot(data=df, x=df.index, y='BB_High', ax=ax, color='red', linestyle='--', label='Banda Alta')
-        sns.lineplot(data=df, x=df.index, y='BB_Low', ax=ax, color='green', linestyle='--', label='Banda Baja')
-        ax.set_title(f'Bandas de Bollinger de {ticker}')
-        ax.set_xlabel('Fecha')
-        ax.set_ylabel('Precio')
-        ax.legend()
-        st.pyplot(fig)
-        
-        # Decisión basada en el modelo
-        if prediction:
-            st.write(f"**Predicción para {ticker}: El precio podría subir.**")
-        else:
-            st.write(f"**Predicción para {ticker}: El precio podría bajar.**")
+        if not df.empty:
+            st.write("Datos de la acción:")
+            st.write(df.tail())
+            
+            # Graficar los datos y los indicadores técnicos
+            st.subheader("Gráficos de Indicadores Técnicos")
+            fig, ax = plt.subplots(2, 2, figsize=(15, 10))
+            ax[0, 0].plot(df['Close'], label='Precio de Cierre')
+            ax[0, 0].plot(df['SMA_50'], label='SMA 50 días', alpha=0.7)
+            ax[0, 0].plot(df['SMA_200'], label='SMA 200 días', alpha=0.7)
+            ax[0, 0].set_title('Precio de Cierre y Medias Móviles')
+            ax[0, 0].legend()
+            
+            ax[0, 1].plot(df['RSI'], label='RSI')
+            ax[0, 1].set_title('Índice de Fuerza Relativa (RSI)')
+            
+            ax[1, 0].plot(df['MACD'], label='MACD')
+            ax[1, 0].plot(df['MACD_Signal'], label='MACD Signal', alpha=0.7)
+            ax[1, 0].set_title('MACD y Línea de Señal')
+            ax[1, 0].legend()
+            
+            ax[1, 1].plot(df['BB_High'], label='Banda Superior')
+            ax[1, 1].plot(df['BB_Low'], label='Banda Inferior')
+            ax[1, 1].set_title('Bandas de Bollinger')
+            ax[1, 1].legend()
+            
+            st.pyplot(fig)
+            
+            prediction, df = predict_stock(df)
+            st.write(f"La predicción para {ticker} es: {'Subirá' if prediction else 'Bajará'}")
+
+if __name__ == "__main__":
+    main()
