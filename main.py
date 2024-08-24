@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pywhatkit as kit
+import numpy as np
 
 # Función para descargar datos y calcular indicadores técnicos
 def get_stock_data(ticker):
@@ -85,8 +85,6 @@ else:
 
 if st.button("Predecir"):
     st.write("Analizando y prediciendo...")
-    messages = []  # Para almacenar los mensajes a enviar
-    
     for ticker in tickers:
         df = get_stock_data(ticker)
         if df.empty:
@@ -135,7 +133,6 @@ if st.button("Predecir"):
         # Mostrar resultado de la predicción
         if prediction:
             st.success(f"¡Se espera que el precio de {ticker} suba!")
-            messages.append(f"¡Se espera que el precio de {ticker} suba!")
         else:
             st.warning(f"No se espera un aumento en el precio de {ticker}.")
         
@@ -161,10 +158,3 @@ if st.button("Predecir"):
             st.write("El volumen está por encima de la media móvil de 20 días, lo que podría confirmar la fuerza de la tendencia.")
         else:
             st.write("El volumen está por debajo de la media móvil de 20 días, lo que podría indicar debilidad en la tendencia.")
-
-    # Enviar mensajes por WhatsApp para las acciones que se espera que suban
-    if messages:
-        phone_number = '+56973866582'  # Reemplaza con el número de teléfono de destino
-        for message in messages:
-            kit.sendwhatmsg(phone_number, message, 17, 25)  # Enviar mensaje a las 15:00 (hora local)
-        st.write("Mensajes enviados por WhatsApp para acciones que se espera que suban.")
