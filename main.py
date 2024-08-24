@@ -2,70 +2,51 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import ta
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from sklearn.ensemble import RandomForestClassifier
 
-# Configuración de la página de Streamlit
-st.set_page_config(page_title="Radar de Aumento de Acciones", layout="wide")
+# Función para descargar datos y calcular indicadores técnicos
+def get_stock_data(ticker):
+    try:
+        df = yf.download(ticker, period='1y', interval='1d', progress=False)
+        df['SMA_50'] = ta.trend.sma_indicator(df['Close'], window=50)
+        df['SMA_200'] = ta.trend.sma_indicator(df['Close'], window=200)
+        df['RSI'] = ta.momentum.rsi(df['Close'])
+        df['Signal'] = df['SMA_50'] > df['SMA_200']  # Señal de cruce dorado
+        return df.dropna()
+    except Exception as e:
+        st.error(f"Error al descargar datos para {ticker}: {e}")
+        return pd.DataFrame()
 
-# Título de la aplicación
-st.title("Radar de Aumento de Acciones")
+# Función para predecir si el precio subirá utilizando un modelo básico
+def predict_stock(df):
+    features = ['SMA_50', 'SMA_200', 'RSI']
+    X = df[features]
+    y = df['Signal'].shift(-1).fillna(False)
+    
+    model = RandomForestClassifier()
+    model.fit(X[:-1], y[:-1])
+    prediction = model.predict(X[-1:])[0]
+    return prediction
 
-# Configuración del rango de fechas
-today = datetime.now().date()
-start_date = today - timedelta(days=365)  # Datos del último año
+# Configuración de la aplicación en Streamlit
+st.title("Predicción de Acciones")
 
-# Interfaz de usuario para ingresar el símbolo de la acción
-symbol = st.text_input("Ingrese el símbolo de la acción", "AAPL").upper()
+tickers = st.text_input("Ingresa los tickers de las acciones separados por comas", "AAPL,MSFT,GOOGL")
+tickers = tickers.split(',')
 
-# Obtener los datos históricos
-def get_data(symbol, start_date):
-    data = yf.download(symbol, start=start_date, end=today)
-    data['Date'] = data.index
-    return data
-
-data = get_data(symbol, start_date)
-
-if not data.empty:
-    # Cálculo de indicadores técnicos
-    data['EMA_20'] = ta.trend.EMAIndicator(data['Close'], window=20).ema_indicator()
-    data['EMA_50'] = ta.trend.EMAIndicator(data['Close'], window=50).ema_indicator()
-    data['RSI'] = ta.momentum.RSIIndicator(data['Close'], window=14).rsi()
-
-    # Condiciones de compra basadas en los indicadores
-    last_rsi = data['RSI'].iloc[-1]
-    last_ema_20 = data['EMA_20'].iloc[-1]
-    last_ema_50 = data['EMA_50'].iloc[-1]
-
-    buy_signal = last_rsi < 30 and last_ema_20 > last_ema_50  # Ejemplo de condiciones para compra
-
-    # Visualización de los datos
-    fig = go.Figure()
-
-    # Gráfico de precios
-    fig.add_trace(go.Candlestick(x=data.index,
-                                open=data['Open'],
-                                high=data['High'],
-                                low=data['Low'],
-                                close=data['Close'],
-                                name='Candlestick'))
-
-    # Gráficos de EMA
-    fig.add_trace(go.Scatter(x=data.index, y=data['EMA_20'], mode='lines', name='EMA 20'))
-    fig.add_trace(go.Scatter(x=data.index, y=data['EMA_50'], mode='lines', name='EMA 50'))
-
-    # Configuración del diseño
-    fig.update_layout(title=f'Análisis de {symbol}',
-                      xaxis_title='Fecha',
-                      yaxis_title='Precio',
-                      xaxis_rangeslider_visible=False)
-
-    st.plotly_chart(fig)
-
-    # Mostrar señales de compra
-    if buy_signal:
-        st.success(f"¡Señal de compra para {symbol}!")
-    else:
-        st.warning(f"No hay señal de compra para {symbol}.")
-else:
-    st.error("No se encontraron datos para el símbolo ingresado.")
+if st.button("Predecir"):
+    st.write("Analizando y prediciendo...")
+    for ticker in tickers:
+        df = get_stock_data(ticker.strip())
+        if df.empty:
+            continue
+        
+        prediction = predict_stock(df)
+        
+        st.subheader(f"Análisis de {ticker}")
+        st.line_chart(df[['Close', 'SMA_50', 'SMA_200']])
+        
+        if prediction:
+            st.success(f"¡Se espera que el precio de {ticker} suba!")
+        else:
+            st.warning(f"No se espera un aumento en el precio de {ticker}.")
